@@ -26,6 +26,11 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew build
+      - name: Download Grype
+        uses: anchore/scan-action/download-grype@v7
+        id: grype
+      - name: Refresh Grype vulnerability DB
+        run: ${{ steps.grype.outputs.cmd }} db update
       - name: Code vulnerability scanning
         id: scan
         uses: anchore/scan-action@v7
@@ -34,8 +39,9 @@ jobs:
           fail-build: false
           severity-cutoff: high
           output-format: sarif
+          cache-db: true
       - name: Upload vulnerability report
-        if: always() && steps.scan.outputs.sarif != ''
+        if: always() && steps.scan.outputs.sarif != '' && hashFiles('**/results.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
@@ -62,16 +68,22 @@ jobs:
           chmod +x gradlew
           ./gradlew bootBuildImage \
             --imageName ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+      - name: Download Grype
+        uses: anchore/scan-action/download-grype@v7
+        id: grype
+      - name: Refresh Grype vulnerability DB
+        run: ${{ steps.grype.outputs.cmd }} db update
       - name: OCI image vulnerability scanning
-        uses: anchore/scan-action@v3
+        uses: anchore/scan-action@v7
         id: scan
         with:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
           fail-build: false
           severity-cutoff: high
           output-format: sarif
+          cache-db: true
       - name: Upload vulnerability report
-        if: always() && steps.scan.outputs.sarif != ''
+        if: always() && steps.scan.outputs.sarif != '' && hashFiles('**/results.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
